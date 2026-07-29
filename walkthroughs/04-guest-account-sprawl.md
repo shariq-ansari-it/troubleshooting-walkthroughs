@@ -8,7 +8,11 @@ A support team was sharing internal training recordings with clients using "Spec
 
 ## How it started
 
-Two separate support requests, weeks apart, both boiling down to: "I tried to share a recording/file with an external client and got an error saying guest invitations aren't allowed." The fix each time looked simple — grant the person the built-in **Guest Inviter** directory role, which does exactly one thing: lets its holder send B2B guest invites, independent of whatever the tenant-wide "members can invite guests" setting is. No other permissions come with it.
+Two separate support requests, weeks apart, both boiling down to: "I tried to share a recording/file with an external client and got an error saying guest invitations aren't allowed." Rather than guessing at a fix, the actual cause was confirmed directly via Microsoft Graph both times: the tenant's `authorizationPolicy.allowInvitesFrom` was set to `adminsAndGuestInviters`, and the affected person held **zero directory role assignments at all** — not an admin, not a Guest Inviter, nothing. Most staff have zero role assignments by default, so this is really a "most people can't invite guests unless someone deliberately grants it" setting, not a misconfiguration.
+
+The fix each time looked simple — grant the person the built-in **Guest Inviter** directory role, which does exactly one thing: lets its holder send B2B guest invites, independent of whatever the tenant-wide "members can invite guests" setting is. No other permissions come with it.
+
+Worth calling out on its own: the second occurrence, weeks after the first and for a completely different person, was recognized quickly as *the same root cause* rather than re-investigated from scratch — a quick check of the affected person's role assignments (empty, same as before) confirmed it in place of re-deriving the whole `allowInvitesFrom` chain again. Recognizing a recurring pattern across unrelated tickets is worth doing deliberately — it turns a second full investigation into a thirty-second check.
 
 After the second occurrence, the role was granted proactively to a few more people expected to hit the same wall. That's where it stopped being simple.
 
@@ -51,3 +55,5 @@ Cleanup: removed the Guest Inviter role from everyone it had been granted to for
 - **Don't default to widening a permission (like Guest Inviter) to solve a symptom — check whether the underlying sharing mechanism is the actual lever first.**
 - **A tenant-wide sharing policy change doesn't automatically cascade to resources that already have their own explicit, stricter setting.** Verify before assuming a policy change reaches everywhere it logically "should."
 - **Anonymous vs. identity-verified sharing is a security tradeoff to make deliberately per use case, not a blanket policy** — match it to how sensitive the actual content is, not just to which team is asking.
+- **When someone hits a "not allowed" error for an action most people can't do by default, check their specific role assignments before assuming a tenant-wide policy is misconfigured.** Here, `allowInvitesFrom` restricting invites to admins and Guest Inviters was working exactly as intended — the "fix" was identifying who legitimately needed the role, not treating the restriction itself as a bug.
+- **The same fix recurring for a different person, weeks later, is worth explicitly recognizing as a pattern rather than re-investigating from first principles** — and worth asking, at that point, whether the *fix* itself (granting a role) is the right long-term answer or just deferring the same underlying tension (here, it turned out to be the latter — see above).
