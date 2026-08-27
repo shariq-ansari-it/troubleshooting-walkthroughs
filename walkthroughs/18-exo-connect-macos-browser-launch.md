@@ -6,6 +6,20 @@
 
 `Connect-ExchangeOnline` (interactive, browser-based auth) can fail immediately with a `PlatformNotSupportedException` on a recently released macOS version — before any login prompt appears, and with no network or account problem involved. The exception message is literally the macOS version string. This is MSAL's cross-platform browser-launch code failing to recognize how new the OS is, not anything wrong with your credentials, your tenant, or your machine. The fix is to skip the local-browser launch path entirely with device code authentication.
 
+## How I got here
+
+The task that led to this was a routine one: move a secondary email address from one shared mailbox to another, so mail sent to that address starts landing in a different inbox. The catch is that an address like that isn't necessarily its own object — it can just as easily be a proxy address (an alias) hanging off a completely unrelated mailbox, and there's no way to tell which from the address alone. Searching for it in the admin center as if it were its own mailbox turns up nothing, which reads like the address doesn't exist at all.
+
+The only reliable way to resolve this is to query Exchange Online directly and see what recipient the address actually resolves to:
+
+```powershell
+Get-Recipient -Identity thataddress@example.com | Select-Object DisplayName, RecipientType, RecipientTypeDetails, PrimarySmtpAddress, EmailAddresses
+```
+
+That's what actually confirmed the address in question was a secondary `smtp:` proxy address on a different mailbox entirely, not a mailbox of its own — which is also what made the fix safe: removing it from one mailbox's `EmailAddresses` collection and adding it to the other's via `Set-Mailbox`, rather than anything involving forwarding rules or a real second mailbox object.
+
+Getting to that answer meant an interactive Exchange Online PowerShell session in the first place — and that's where the actual gotcha in this write-up showed up, before a single `Get-Recipient` call could even run.
+
 ## The symptom
 
 ```
