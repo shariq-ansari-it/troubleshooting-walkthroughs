@@ -24,7 +24,14 @@ The instinct when a slowdown coincides with new users is to assume the new sessi
 
 Addressed in priority order, since disk space was the most acute (and easiest to make worse by doing things in the wrong order):
 
-1. **SQL transaction log cleanup** first — freeing critical disk space immediately, since everything else on the host (including Windows Update, which was also queued) was constrained by how little free space remained.
+1. **SQL transaction log cleanup** first — freeing critical disk space immediately, since everything else on the host (including Windows Update, which was also queued) was constrained by how little free space remained. Find out *why* the log is growing before shrinking anything:
+
+   ```sql
+   SELECT name, recovery_model_desc, log_reuse_wait_desc FROM sys.databases;
+   DBCC SQLPERF(LOGSPACE);
+   ```
+
+   `FULL` recovery with no log backups is the usual cause — either schedule log backups or switch to `SIMPLE` if point-in-time recovery isn't needed, then shrink the log through SQL. **Never delete `.ldf` files to "clear SQL logs"** — that can take the database offline. Old log backups and SQL `ERRORLOG` files are the only things safe to delete by hand.
 2. **Disable the unnecessary Windows Push Notification service** — a small but free resource-consumption win with genuinely zero downside on a server host.
 3. **Schedule a Windows Update maintenance window** — deferred to a planned time rather than run immediately, since the environment was already under pressure and an update cycle mid-incident would have added more load, not relieved it.
 

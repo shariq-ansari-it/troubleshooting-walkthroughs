@@ -27,7 +27,7 @@ Two independent dead ends, from two unrelated causes, both converging on the sam
 1. The administrative-ownership path is gone because the feature itself was retired platform-wide.
 2. The billing-ownership path is blocked because of how this specific subscription is billed (CSP/Partner), not because of any misconfiguration on it.
 
-Neither is a bug to fix or a permission to request — both are Microsoft's deliberate platform/program boundaries. The actual remaining paths are either a Microsoft-support-brokered process (similar in spirit to a billing-account-transfer support case), or addressing it structurally — e.g., provisioning a fresh subscription under current, correctly-modeled billing/administration and migrating workloads across, rather than continuing to try to "fix" administration on a subscription whose underlying program type no longer has a self-service ownership path at all.
+Neither is a bug to fix or a permission to request — both are Microsoft's deliberate platform/program boundaries. The actual remaining paths are either a Microsoft-support-brokered process (similar in spirit to the billing-account-transfer support case in [walkthrough 01](01-billing-credit-wrong-account.md)), or addressing it structurally — e.g., provisioning a fresh subscription under current, correctly-modeled billing/administration and migrating workloads across, rather than continuing to try to "fix" administration on a subscription whose underlying program type no longer has a self-service ownership path at all.
 
 ## Takeaways
 

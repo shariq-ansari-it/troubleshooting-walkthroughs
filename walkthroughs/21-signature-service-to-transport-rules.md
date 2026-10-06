@@ -1,6 +1,6 @@
 # Replacing a Third-Party Email Signature Service With Exchange Transport Rules
 
-## 🎯 Purpose of this Document
+## Purpose of this Document
 
 A case study and reference runbook for replacing a paid email signature SaaS with native Exchange Online mail flow (transport) rules — one HTML signature per sender, filled in from each user's Entra profile.
 
@@ -11,7 +11,7 @@ It is intentionally written to:
 - Record each roadblock with its symptom, cause and fix, so it can be recognised quickly next time
 - Act as a memory refresh for a task that only comes round once (and then for joiners/leavers)
 
-## 🧱 Environment
+## Environment
 
 - Exchange Online (Microsoft 365 Business Premium)
 - Existing third-party cloud signature service (transport rule + outbound/inbound connectors)
@@ -22,11 +22,11 @@ It is intentionally written to:
 
 ---
 
-## ✅ Correct End-to-End Process (Authoritative)
+## Correct End-to-End Process (Authoritative)
 
 This is the clean path to follow for future migrations.
 
-### 1️⃣ Inventory the Current Setup
+### 1. Inventory the Current Setup
 
 Cloud signature products usually hook into Exchange Online with:
 
@@ -69,7 +69,7 @@ Also check:
 - **Microsoft 365 admin center → Settings → Integrated apps** → vendor Outlook add-in
 - **Entra admin center → Enterprise applications** → vendor app
 
-### 2️⃣ Check Directory Data
+### 2. Check Directory Data
 
 Every signature field comes from Entra — a blank attribute becomes a blank line.
 
@@ -92,7 +92,7 @@ Check for:
 - **Shared mailboxes** with description text as the job title ("Shared mailbox with archiving") — decide if they get a signature; fix the title first if so
 - **Leavers / disabled-but-licensed accounts** — leave out of the rollout list
 
-### 3️⃣ Build the Signature HTML
+### 3. Build the Signature HTML
 
 1. Send yourself an email with the current vendor signature and view its source.
 2. Rebuild it as a single `<table>` with **inline styles only** (mail clients ignore `<style>` blocks).
@@ -116,14 +116,14 @@ Check for:
 
 Must-haves:
 
-- ⚠️ A **visible text line** `Email: %%Email%%` — the rule uses it to detect a signature already in the thread. Text inside an `href` isn't matched.
+- A **visible text line** `Email: %%Email%%` — the rule uses it to detect a signature already in the thread. Text inside an `href` isn't matched.
 - `width`, `height` and `alt` on every `<img>`
 - **Under 5,000 characters** total — Exchange rejects longer disclaimer text
 - A little **top padding** on the outer table — the signature is appended straight after the last line of the body
 
-The template lives in the create script — see [Appendix A](#-appendix-a--new-signatureruleps1).
+The template lives in the create script — see [Appendix A](#appendix-a--new-signatureruleps1).
 
-### 4️⃣ Host the Images
+### 4. Host the Images
 
 Images must be on a public HTTPS URL with stable file names.
 
@@ -150,21 +150,21 @@ done
 
 Expected: every line `200 image/png`.
 
-### 5️⃣ Put the Scripts in Source Control
+### 5. Put the Scripts in Source Control
 
 Three scripts, kept together (e.g. `Exchange/` in the infrastructure repo) with a copy of the images:
 
 | Script | Purpose |
 |---|---|
-| [`New-SignatureRule.ps1`](#-appendix-a--new-signatureruleps1) | Create/update one rule per sender (`Signature - <Display Name>`) |
-| [`Remove-SignatureRule.ps1`](#-appendix-b--remove-signatureruleps1) | Remove rules — rollback / leavers |
-| [`Set-ServiceRuleSenderExclusion.ps1`](#-appendix-c--set-servicerulesenderexclusionps1) | Add/remove senders on the old service's `ExceptIfFrom` list |
+| [`New-SignatureRule.ps1`](#appendix-a--new-signatureruleps1) | Create/update one rule per sender (`Signature - <Display Name>`) |
+| [`Remove-SignatureRule.ps1`](#appendix-b--remove-signatureruleps1) | Remove rules — rollback / leavers |
+| [`Set-ServiceRuleSenderExclusion.ps1`](#appendix-c--set-servicerulesenderexclusionps1) | Add/remove senders on the old service's `ExceptIfFrom` list |
 
 All support `-WhatIf` and reuse an existing Exchange Online session.
 
 Commit them **before** running anything.
 
-### 6️⃣ Pilot on One Mailbox
+### 6. Pilot on One Mailbox
 
 Use your own mailbox. **Everything below runs in one PowerShell window** (see [Issue 3](#issue-3--powershell-commands-pasted-into-zsh)).
 
@@ -223,9 +223,9 @@ Check in **Exchange admin center (admin.exchange.microsoft.com) → Mail flow �
 
 Optional safer first run: add `-Mode Audit` — rule evaluates and logs (visible in message trace) without changing mail; rerun without it to enforce.
 
-### 7️⃣ Test
+### 7. Test
 
-⏱ **Wait ~30 minutes** — rule changes take time to replicate.
+**Wait ~30 minutes** — rule changes take time to replicate.
 
 Send from the work mailbox to a personal external address:
 
@@ -242,9 +242,9 @@ If a test shows two signatures or none:
 
 - wait another 15–30 min and resend (propagation)
 - **Exchange admin center → Mail flow → Message trace** → open the message → shows which rules matched
-- confirm the exclusion is still on the routing rule (see [Lessons Learned](#-lessons-learned))
+- confirm the exclusion is still on the routing rule (see [Lessons Learned](#lessons-learned))
 
-### 8️⃣ Roll Out
+### 8. Roll Out
 
 ```powershell
 $senders = @(
@@ -265,24 +265,24 @@ Get-TransportRule | Where-Object Name -like 'Signature - *' |
 
 Tell users first — the signature looks slightly different and only appears on the first message in a thread.
 
-### 9️⃣ Cut the Old Service Off
+### 9. Cut the Old Service Off
 
 Do this as soon as everyone is moved — not when the subscription lapses, or mail keeps routing to a service that's about to stop.
 
 ```powershell
-# 1. Disable (reversible)
+# . Disable (reversible)
 Disable-TransportRule -Identity "Identify messages to send to <service>" -Confirm:$false
 ```
 
 Test, check message trace, leave it a day. Then:
 
 ```powershell
-# 2. Remove rule + connectors (names from step 1)
+# . Remove rule + connectors (names from step 1)
 Remove-TransportRule     -Identity "Identify messages to send to <service>" -Confirm:$false
 Remove-OutboundConnector -Identity "<service outbound connector>"           -Confirm:$false
 Remove-InboundConnector  -Identity "<service inbound connector>"            -Confirm:$false
 
-# 3. Confirm nothing left
+# . Confirm nothing left
 Get-TransportRule | Where-Object Name -like '*<service>*'
 Get-OutboundConnector; Get-InboundConnector
 ```
@@ -294,7 +294,7 @@ Also remove, if present:
 
 The `ExceptIfFrom` exclusions go with the routing rule — nothing else to clean up.
 
-### 🔟 Cancel the Subscription
+### 10. Cancel the Subscription
 
 Signature SaaS typically: **annual auto-renew**, **30 days' written notice** before renewal, **no refund** for unused time.
 
@@ -304,11 +304,11 @@ Signature SaaS typically: **annual auto-renew**, **30 days' written notice** bef
 
 Notice and cutover are independent — give notice early, use the remaining paid weeks as the cutover window.
 
-**If this all happens → ✅ migration complete.**
+**If this all happens → migration complete.**
 
 ---
 
-## 🔁 Ongoing: Joiners, Leavers, Changes
+## Ongoing: Joiners, Leavers, Changes
 
 | Event | Action |
 |---|---|
@@ -326,7 +326,7 @@ $all = Get-TransportRule | Where-Object Name -like 'Signature - *' | ForEach-Obj
 .\New-SignatureRule.ps1 -Sender $all
 ```
 
-## 🖱 Admin Center Alternative (Single Rule)
+## Admin Center Alternative (Single Rule)
 
 1. **Exchange admin center → Mail flow → Rules → + Add a rule → Apply disclaimers**
 2. **Name:** `Signature - <Display Name>`
@@ -343,26 +343,13 @@ Fine for one; use the scripts for more.
 
 ---
 
-## ❗ Issues Encountered in This Case
+## Issues Encountered in This Case
 
 ### Issue 1 — `Connect-ExchangeOnline` throws `PlatformNotSupportedException`
 
-**Observed:** no browser opens; fails immediately.
+**Observed:** `PlatformNotSupportedException: macOS <version>` as soon as `Connect-ExchangeOnline` runs; no browser opens.
 
-```
-Error Acquiring Token:
-System.PlatformNotSupportedException: macOS 27.0.1
-   at Microsoft.Identity.Client.Platforms.netstandard.NetCorePlatformProxy.StartDefaultOsBrowserAsync(...)
-OperationStopped: macOS 27.0.1
-```
-
-**Root cause:** MSAL bundled in the module doesn't recognise the macOS version and refuses to launch the browser. Not a permissions or network problem. Full detail in [walkthrough 18](18-exo-connect-macos-browser-launch.md).
-
-**Fix:** device code sign-in.
-
-```powershell
-Connect-ExchangeOnline -Device -UserPrincipalName admin@example.com
-```
+**Fix:** `Connect-ExchangeOnline -Device`. Root cause and full detail: [walkthrough 18](18-exo-connect-macos-browser-launch.md).
 
 ### Issue 2 — Script fails with the same exception after a working `-Device` sign-in
 
@@ -425,7 +412,7 @@ function function>
 
 **Root cause:** `pwsh` hadn't started yet when the remaining lines arrived, so zsh tried to parse the PowerShell `function` lines itself.
 
-**Fix:** `Ctrl+C`. Run `pwsh` on its own, wait for `PS >`, then paste PowerShell lines. Keep the same window for everything — the device-code session only exists in that window.
+**Fix:** `Ctrl+C`. Run `pwsh` on its own, wait for `PS >`, then paste PowerShell lines. Keep the same window for everything — the device-code session only exists in that PowerShell process (same principle as the Graph session in [walkthrough 07](07-az-login-cant-query-intune.md)).
 
 ### Issue 4 — Reply-chain test looked incomplete
 
@@ -443,17 +430,17 @@ function function>
 
 ---
 
-## 📊 Pilot Test Results
+## Pilot Test Results
 
 | Test | Result |
 |---|---|
-| New message | ✅ One signature, all images, Entra fields correct |
-| Inbound | ✅ Untouched |
-| Reply chain | ✅ No duplicates; no new signature on later replies (by design) |
-| Meeting invite | ✅ No signature, `.ics` intact |
-| Dark-mode client | ✅ Renders; logo on its own white background |
+| New message | One signature, all images, Entra fields correct |
+| Inbound | Untouched |
+| Reply chain | No duplicates; no new signature on later replies (by design) |
+| Meeting invite | No signature, `.ics` intact |
+| Dark-mode client | Renders; logo on its own white background |
 
-## 🧠 Lessons Learned
+## Lessons Learned
 
 - A signature SaaS doing one standard template is replaceable with native rules + directory tokens
 - **One rule per sender**, because the "already signed" check needs a phrase unique to that sender — a shared rule either stacks signatures or suppresses yours when a colleague's is quoted
@@ -466,7 +453,7 @@ function function>
 - **Scripts should reuse an existing EXO session** — anything that connects unconditionally breaks device-code workflows
 - **Notice deadline ≠ cutover deadline** — give notice early
 
-## 🧰 Quick Reference Checklist
+## Quick Reference Checklist
 
 | If you see… | Do this |
 |---|---|
@@ -481,7 +468,7 @@ function function>
 
 ---
 
-## 📎 Appendix A — `New-SignatureRule.ps1`
+## Appendix A — `New-SignatureRule.ps1`
 
 ```powershell
 <#
@@ -583,7 +570,7 @@ finally {
 }
 ```
 
-## 📎 Appendix B — `Remove-SignatureRule.ps1`
+## Appendix B — `Remove-SignatureRule.ps1`
 
 ```powershell
 [CmdletBinding(SupportsShouldProcess)]
@@ -620,7 +607,7 @@ finally {
 }
 ```
 
-## 📎 Appendix C — `Set-ServiceRuleSenderExclusion.ps1`
+## Appendix C — `Set-ServiceRuleSenderExclusion.ps1`
 
 ```powershell
 [CmdletBinding(SupportsShouldProcess)]

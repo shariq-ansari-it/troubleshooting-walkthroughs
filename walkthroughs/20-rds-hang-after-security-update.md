@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-A Hyper-V guest running a multi-user line-of-business app (Sage 200 desktop client over RDP, with SQL Server) stopped accepting logons: new RDP sessions failed, and so did logons through the Hyper-V console. Hyper-V said the VM was running, heartbeat OK, low CPU. Low disk space was the first guess, because SQL logs had been cleared two days earlier, but it turned out to have nothing to do with it. The real cause was a known Microsoft bug in the **September 2026 security update (KB5122871 on Server 2025, KB5122882 on Server 2022)** that can leave Remote Desktop Services hung. Microsoft fixed it in an out-of-band update released days later, but that fix is **offered only through the Update Catalog and WSUS, not Windows Update**. The server had installed the faulty update twelve days *after* the fix came out and never received the fix.
+A Hyper-V guest running a multi-user line-of-business app (Sage 200 desktop client over RDP, with SQL Server) stopped accepting logons: new RDP sessions failed, and so did logons through the Hyper-V console. Hyper-V said the VM was running, heartbeat OK, low CPU. Low disk space was the first guess, because SQL logs had been cleared two days earlier (log growth on this kind of host is covered in [walkthrough 15](15-rds-performance-collapse.md)), but it turned out to have nothing to do with it. The real cause was a known Microsoft bug in the **September 2026 security update (KB5122871 on Server 2025, KB5122882 on Server 2022)** that can leave Remote Desktop Services hung. Microsoft fixed it in an out-of-band update released days later, but that fix is **offered only through the Update Catalog and WSUS, not Windows Update**. The server had installed the faulty update twelve days *after* the fix came out and never received the fix.
 
 ## The symptom
 
@@ -142,14 +142,7 @@ So this wasn't just bad luck, and it will happen again. Every other Server 2022/
 ## Found along the way (unrelated to the hang, still worth fixing)
 
 - **A forgotten Hyper-V checkpoint, seven months old.** The differencing disk (`.avhdx`) was ~155 GB against a 24 GB parent, so almost everything since the checkpoint was in the child disk. That's why *Edit Disk* was greyed out and the VM disk couldn't be expanded. Merging it needs roughly the size of the child disk in free host space, and a merge that fills the host volume **pauses every VM on that volume**. The plan: free host space first (e.g. `Move-VMStorage` a powered-off VM to another volume), delete the checkpoint out of hours, wait for the merge, then `Resize-VHD` and extend the guest volume. Check for a recovery partition sitting after C:. Also: **don't take a "safety" checkpoint before patching** when host space is already tight.
-- **SQL transaction log growth.** This is what caused the disk-space scare in the first place. Fix the recovery model and log backups rather than deleting log files:
-
-  ```sql
-  SELECT name, recovery_model_desc, log_reuse_wait_desc FROM sys.databases;
-  DBCC SQLPERF(LOGSPACE);
-  ```
-
-  **Never delete `.ldf` files to "clear SQL logs".** Shrink through SQL, or remove old log backups and ERRORLOGs only.
+- **SQL transaction log growth.** This is what caused the disk-space scare in the first place. Diagnosis and the safe fix (recovery model, log backups, never deleting `.ldf` files) are in [walkthrough 15](15-rds-performance-collapse.md).
 
 ## Gotchas
 
