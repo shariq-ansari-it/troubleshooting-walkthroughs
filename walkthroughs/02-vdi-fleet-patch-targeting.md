@@ -1,26 +1,34 @@
 # Patching a VDI Fleet Without Touching Everyone Else's Session
 
-**Stack:** Microsoft Intune, Microsoft Graph API, Win32 LOB apps, Azure Virtual Desktop
+## Purpose of this Document
 
-## TL;DR
+A case study and runbook for pushing an urgent Win32 app update to exactly one Intune-managed virtual desktop, after a softphone/VDI client hit the vendor's server-side minimum-version cutoff ("Update required — your desktop app is no longer supported") while identical VMs in the same group kept working. The fix combined a Win32 supersedence chain with an Intune Assignment Filter.
 
-A softphone/VDI client app started throwing "Update required — your desktop app is no longer supported" on one virtual desktop, while identical VMs in the same Intune group kept working fine. The app vendor enforces a minimum client version server-side; once a version falls below the cutoff, it stops working entirely rather than degrading gracefully. The fix needed a Win32 app supersedence chain in Intune plus a way to push the update to exactly one device without triggering an update — and a possible outage — across the whole fleet at once. Intune Assignment Filters solved the targeting problem; a Graph API quirk almost derailed the supersedence setup.
+It is intentionally written to:
 
-## Background
+- Give the working Graph calls for supersedence and single-device targeting
+- Keep the working path separate from the documented-but-broken supersedence pattern
+- Help recognise the minimum-version outage pattern before it happens again
 
-The environment: a fleet of Azure Virtual Desktop VMs, each running a VDI-aware softphone client. The vendor ships the client as two logical components — a main app that runs on the VM, and a local plugin that runs on the user's physical endpoint to offload audio/video processing back to their own device (without it, calls still work, but quality suffers and the VM absorbs load it shouldn't have to). Both are deployed as Win32 line-of-business apps through Intune.
+## Environment
 
-The vendor enforces a hard minimum supported version. Below that version, the app doesn't just nag you to update — it refuses to function. One VM in the fleet hit that wall.
+- Azure Virtual Desktop VMs, all in one Intune device group
+- Microsoft Intune — Win32 line-of-business apps, supersedence, Assignment Filters
+- Microsoft Graph API (`beta` and `v1.0`), called via `Invoke-MgGraphRequest`
+- VDI-aware softphone client shipped as two Win32 apps:
+  - a main app that runs on the VM
+  - a local plugin on the user's physical endpoint that offloads audio/video processing (without it calls still work, but quality suffers and the VM absorbs load it shouldn't)
+- Vendor enforces a hard minimum supported client version server-side
 
-## Why not just push the update to the whole group?
+---
 
-Because the rest of the group was working fine, and a same-day fleet-wide app push means a same-day risk of breaking working sessions for everyone else, with no ability to stage or roll back gradually. The goal was: patch the one broken VM immediately, then plan the fleet-wide rollout separately and deliberately.
+## Correct End-to-End Process (Authoritative)
 
-## Setting up the update itself
+The goal: patch the one broken VM immediately, then plan the fleet-wide rollout separately and deliberately. Pushing to the whole group same-day risks breaking working sessions for everyone else, with no ability to stage or roll back gradually.
 
-Intune's mechanism for "this new app version replaces that old one" is **supersedence**, configured on Win32 LOB apps. The Graph API documentation describes updating relationships via a `relationships` navigation property with an OData type cast on the app object. That path did not work in practice — it silently failed to persist the supersedence relationship.
+### 1. Set Up Supersedence on the New App Version
 
-What actually works is calling the dedicated action endpoint directly, with no cast:
+In Intune, "this new app version replaces that old one" is **supersedence**, configured on Win32 LOB apps. Call the dedicated action endpoint directly, with no cast (the documented navigation-property pattern doesn't persist — see [Issue 1](#issue-1--documented-supersedence-pattern-silently-doesnt-persist)):
 
 ```
 POST /beta/deviceAppManagement/mobileApps/{newAppId}/updateRelationships
@@ -33,11 +41,9 @@ POST /beta/deviceAppManagement/mobileApps/{newAppId}/updateRelationships
 }
 ```
 
-This is the kind of thing that's easy to lose an hour to if you trust the documented navigation-property pattern at face value — the dedicated action endpoint isn't the first thing you'd reach for, and there's no error message steering you toward it; the call to the documented pattern just doesn't do anything.
+### 2. Create an Assignment Filter for the One Device
 
-## Targeting exactly one device
-
-Intune app assignments target groups, not individual devices — by design, since managing per-device assignments doesn't scale. For a one-off "just this VM" situation, the tool for the job is an **Assignment Filter**: a rule evaluated against device properties (name, OS, model, etc.) that narrows down who in an assigned group actually receives the app.
+Intune app assignments target groups, not individual devices — by design, since per-device assignments don't scale. An **Assignment Filter** is a rule evaluated against device properties (name, OS, model, etc.) that narrows down who in an assigned group actually receives the app.
 
 ```powershell
 $filter = @{
@@ -50,7 +56,9 @@ Invoke-MgGraphRequest -Method POST `
   -Body $filter -ContentType "application/json"
 ```
 
-Then assign the new app version to the existing device group as normal, but attach the filter with `include` mode so only devices matching the rule actually get it:
+### 3. Assign the New Version to the Existing Group With the Filter in `include` Mode
+
+Assign to the existing device group as normal, attaching the filter so only matching devices get it:
 
 ```powershell
 $assignment = @{
@@ -70,10 +78,45 @@ Invoke-MgGraphRequest -Method POST `
   -Body $assignment -ContentType "application/json"
 ```
 
-The rest of the group is untouched; only the device matching the filter gets the new version on next sync. Once the fix was validated, removing the filter (or widening its rule) rolls the same supersedence chain out to the whole fleet on the team's own schedule.
+Expected: the rest of the group is untouched; only the device matching the filter gets the new version on next sync.
 
-## Takeaways
+### 4. Widen to the Fleet When Ready
+
+Once the fix is validated, remove the filter (or widen its rule) to roll the same supersedence chain out to the whole fleet on your own schedule — without re-touching the base group assignment.
+
+**If this all happens → the broken VM is patched now, and the fleet rollout is a deliberate later step.**
+
+---
+
+## Issues Encountered in This Case
+
+### Issue 1 — Documented supersedence pattern silently doesn't persist
+
+**Observed:** setting supersedence via the `relationships` navigation property with an OData type cast on the app object, as the Graph API documentation describes, did nothing — the relationship wasn't saved, and no error was returned.
+
+**Root cause:** that path silently fails to persist the supersedence relationship.
+
+**Fix:** call `/updateRelationships` directly on the app, no cast ([step 1](#1-set-up-supersedence-on-the-new-app-version)). Easy to lose an hour to — nothing steers you toward the action endpoint.
+
+### Issue 2 — App refuses to run below the vendor's minimum version
+
+**Observed:** "Update required — your desktop app is no longer supported" on one VM; identical VMs in the same Intune group still fine.
+
+**Root cause:** the vendor enforces a minimum client version server-side. Below the cutoff the app doesn't nag — it stops working entirely.
+
+**Fix:** push the newer version via supersedence, targeted to the affected device first ([steps 1–3](#1-set-up-supersedence-on-the-new-app-version)).
+
+## Lessons Learned
 
 - **A vendor's server-side minimum-version enforcement can turn a "nice to update eventually" app into a hard outage with zero warning.** Worth knowing this before it happens, not during.
 - **Intune's documented supersedence relationship pattern (cast + `/relationships`) doesn't reliably persist changes** — use the `/updateRelationships` action directly on the app.
 - **Assignment Filters are the right tool for "just this one device," not manual per-device assignment.** They let you scope a change tightly now and widen it deliberately later, without ever re-touching the base group assignment.
+
+## Quick Reference Checklist
+
+| If you see… | Do this |
+|---|---|
+| "Update required — your desktop app is no longer supported" | Vendor minimum-version cutoff — push the new version via supersedence |
+| Supersedence via `relationships` + cast doesn't stick | `POST .../mobileApps/{newAppId}/updateRelationships`, no cast |
+| Need to update one device without touching its group | Assignment Filter on `device.deviceName`, assignment with `include` mode |
+| Fix validated on one device | Remove or widen the filter to roll out to the fleet |

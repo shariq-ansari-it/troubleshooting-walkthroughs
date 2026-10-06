@@ -1,36 +1,48 @@
 # Guest Account Sprawl From "Helpful" Sharing Links
 
-**Stack:** Microsoft Entra ID (Azure AD), SharePoint/OneDrive, Microsoft Graph audit logs, PnP PowerShell
+## Purpose of this Document
 
-## TL;DR
+A case study of guest account sprawl caused by support staff sharing training recordings with clients via OneDrive "Specific people" links — the option that felt most secure, but which silently creates a *permanent* external guest account per recipient. Traced via directory audit logs, then fixed with a deliberate tradeoff: anonymous, time-boxed links for this low-sensitivity content instead of granting more people the ability to invite guests.
 
-A support team was sharing internal training recordings with clients using "Specific people" links in OneDrive — the option that felt most secure. Each one of those links silently created a *permanent* external guest account in the directory, whether or not the recipient ever needed ongoing access. Traced it via directory audit logs, then made a deliberate tradeoff: switch the sharing default to anonymous, time-boxed links for this specific low-sensitivity content, instead of reflexively granting more people the ability to invite guests.
+It is intentionally written to:
 
-## How it started
+- Give the final sharing-policy change and cleanup that resolved it
+- Separate it from the first fix (granting Guest Inviter) that worked per-ticket but fed the sprawl
+- Help recognise both the "guest invitations aren't allowed" error and the sprawl pattern next time
 
-Two separate support requests, weeks apart, both boiling down to: "I tried to share a recording/file with an external client and got an error saying guest invitations aren't allowed." Rather than guessing at a fix, the actual cause was confirmed directly via Microsoft Graph both times: the tenant's `authorizationPolicy.allowInvitesFrom` was set to `adminsAndGuestInviters`, and the affected person held **zero directory role assignments at all** — not an admin, not a Guest Inviter, nothing. Most staff have zero role assignments by default, so this is really a "most people can't invite guests unless someone deliberately grants it" setting, not a misconfiguration.
+## Environment
 
-The fix each time looked simple — grant the person the built-in **Guest Inviter** directory role, which does exactly one thing: lets its holder send B2B guest invites, independent of whatever the tenant-wide "members can invite guests" setting is. No other permissions come with it.
+- Microsoft Entra ID (Azure AD) — B2B guests, `authorizationPolicy.allowInvitesFrom`, Guest Inviter directory role
+- SharePoint Online / OneDrive sharing
+- Microsoft Graph — directory audit logs, role assignments
+- PnP PowerShell (`Set-PnPTenant`, `Get-PnPTenantSite`)
 
-Worth calling out on its own: the second occurrence, weeks after the first and for a completely different person, was recognized quickly as *the same root cause* rather than re-investigated from scratch — a quick check of the affected person's role assignments (empty, same as before) confirmed it in place of re-deriving the whole `allowInvitesFrom` chain again. Recognizing a recurring pattern across unrelated tickets is worth doing deliberately — it turns a second full investigation into a thirty-second check.
+---
 
-After the second occurrence, the role was granted proactively to a few more people expected to hit the same wall. That's where it stopped being simple.
+## Correct End-to-End Process (Authoritative)
 
-## What actually happened
+### 1. Confirm the Cause of the "Guest Invitations Aren't Allowed" Error
 
-Every time someone used a "Specific people" share link — the option that sounds the most restrictive and secure — Entra silently created a permanent guest account for that external recipient, if one didn't already exist. This is expected, documented behavior: identity-verified sharing needs an identity to verify against, so an invite goes out and a guest object gets created regardless of whether the recipient ever accepts it or needs continued access.
+Check via Microsoft Graph rather than guessing:
 
-Multiple people now holding Guest Inviter, all sharing training material with a rotating set of external contacts, meant a steady accumulation of guest accounts — a chunk of which were invited but never signed in at all (recipient never needed to actually visit anything, or just watched an emailed preview).
+- tenant `authorizationPolicy.allowInvitesFrom` — here `adminsAndGuestInviters`
+- the affected person's directory role assignments — here **zero**
 
-## Tracing it
+Most staff have zero role assignments by default, so this is "most people can't invite guests unless someone deliberately grants it" — working as intended, not a misconfiguration. On a repeat ticket, the role-assignment check alone confirms it ([Issue 1](#issue-1--guest-invitations-arent-allowed-error)).
 
-Confirmed the pattern via Microsoft Graph's directory audit logs, filtering for `activityDisplayName eq 'Invite external user'`. The initiating application on every relevant entry was SharePoint Online itself — not a person directly running an "invite guest" flow, but the sharing feature doing it as a side effect. That confirmed the mechanism: this wasn't people misusing the Guest Inviter role, it was the *sharing link type itself* that caused it.
+### 2. Check Whether Sharing Links Are Creating Guests
 
-Checked why anonymous "Anyone with the link" sharing wasn't already an option — the tenant's OneDrive sharing capability was capped at "existing guests" (identity-verified sharing only), so anonymous links weren't even offered as a choice in the share dialog. That's what pushed people toward identity-verified guest invites for content that didn't actually need per-person revocable access.
+Query Microsoft Graph directory audit logs filtered on `activityDisplayName eq 'Invite external user'` and look at the initiating application.
 
-## The fix, and the tradeoff behind it
+Here every relevant entry was initiated by **SharePoint Online** — the sharing feature creating guests as a side effect, not a person running an invite flow. See [Issue 2](#issue-2--specific-people-links-create-permanent-guest-accounts).
 
-Rather than keep granting Guest Inviter to more people (which only makes the underlying sprawl mechanism run faster), the actual lever was the sharing policy itself:
+### 3. Check the OneDrive Sharing Ceiling
+
+Find out why anonymous "Anyone with the link" wasn't offered. Here the tenant's OneDrive sharing capability was capped at "existing guests" (identity-verified only), so anonymous links weren't a choice in the share dialog — pushing people to guest invites for content that didn't need per-person revocable access.
+
+### 4. Change the Sharing Policy
+
+Rather than keep granting Guest Inviter (which only makes the sprawl run faster), change the sharing policy itself:
 
 ```powershell
 Set-PnPTenant `
@@ -40,15 +52,63 @@ Set-PnPTenant `
   -RequireAnonymousLinksExpireInDays 60
 ```
 
-This raises OneDrive's sharing ceiling to allow anonymous, time-boxed links — no guest account gets created per share, and links auto-expire after 60 days.
+This raises OneDrive's ceiling to allow anonymous, time-boxed links — no guest account per share, and links auto-expire after 60 days.
 
-Two things worth calling out about this change:
-- **It only affects OneDrive (and any newly created SharePoint site going forward).** Raising the tenant-wide ceiling did **not** retroactively loosen existing SharePoint site collections — each one already had its own, more restrictive sharing capability locked in at creation time. Verified this with `Get-PnPTenantSite` before assuming the change was universal.
-- **Anonymous links are a real, deliberate tradeoff, not a free upgrade.** A forwardable link with no per-person revocation and no way to claw back an already-downloaded copy is a worse security posture *in general* than identity-verified access. It was the right call **specifically** because the content in question was low-value outside the context of an existing paying customer relationship (product training material) — not a decision to generalize to every sharing scenario in the tenant.
+This is a deliberate tradeoff, not a free upgrade — see [Issue 3](#issue-3--anonymous-links-are-a-weaker-posture).
 
-Cleanup: removed the Guest Inviter role from everyone it had been granted to for this purpose, and deleted the guest accounts that had been invited but never signed in. Left alone the handful of guest accounts that were genuinely, actively being used for ongoing external collaboration.
+### 5. Verify Which Sites the Change Actually Reached
 
-## Takeaways
+Run `Get-PnPTenantSite` before assuming the change is universal. It only affects OneDrive and newly created SharePoint sites — see [Issue 4](#issue-4--tenant-change-doesnt-reach-existing-sharepoint-sites).
+
+### 6. Clean Up
+
+- Remove the Guest Inviter role from everyone it was granted to for this purpose
+- Delete guest accounts that were invited but never signed in
+- Leave the guest accounts genuinely in active use for ongoing external collaboration
+
+**If this all happens → clients get time-boxed links, and no new guest accounts accumulate from routine sharing.**
+
+---
+
+## Issues Encountered in This Case
+
+### Issue 1 — "Guest invitations aren't allowed" error
+
+**Observed:** two separate support requests, weeks apart, for different people: sharing a recording/file with an external client failed with an error saying guest invitations aren't allowed.
+
+**Root cause:** `allowInvitesFrom` = `adminsAndGuestInviters`, and the person held no directory roles at all. Working as intended.
+
+**What didn't work (long-term):** granting the built-in **Guest Inviter** role. It does exactly one thing — lets its holder send B2B guest invites, independent of the tenant-wide "members can invite guests" setting, with no other permissions. It fixed each ticket, and after the second occurrence was granted proactively to a few more people expected to hit the same wall. That's where it stopped being simple: more inviters meant faster sprawl ([Issue 2](#issue-2--specific-people-links-create-permanent-guest-accounts)).
+
+**Fix:** the sharing-policy change in [step 4](#4-change-the-sharing-policy); Guest Inviter grants removed in [step 6](#6-clean-up).
+
+The second occurrence was recognised quickly as the same root cause — a check of the person's role assignments (empty, as before) replaced re-deriving the whole `allowInvitesFrom` chain, turning a second full investigation into a thirty-second check.
+
+### Issue 2 — "Specific people" links create permanent guest accounts
+
+**Observed:** steady accumulation of guest accounts as several Guest Inviter holders shared training material with a rotating set of external contacts; a chunk were invited but never signed in (recipient never needed to visit anything, or just watched an emailed preview).
+
+**Root cause:** expected, documented behaviour — identity-verified sharing needs an identity to verify against, so every "Specific people" link sends an invite and creates a guest object (if one doesn't exist), whether or not the recipient accepts or needs continued access. Audit logs showed SharePoint Online as the initiating app, so it was the *link type itself*, not misuse of the Guest Inviter role.
+
+**Fix:** anonymous, expiring links for this content ([step 4](#4-change-the-sharing-policy)).
+
+### Issue 3 — Anonymous links are a weaker posture
+
+**Observed:** n/a — a design consideration.
+
+**Root cause:** a forwardable link with no per-person revocation and no way to claw back an already-downloaded copy is a worse security posture *in general* than identity-verified access.
+
+**Fix:** accepted **specifically** because the content (product training material) was low-value outside an existing paying customer relationship — not a decision to generalise to every sharing scenario in the tenant.
+
+### Issue 4 — Tenant change doesn't reach existing SharePoint sites
+
+**Observed:** raising the tenant-wide ceiling did **not** loosen existing SharePoint site collections.
+
+**Root cause:** each existing site already had its own, more restrictive sharing capability locked in at creation time.
+
+**Fix:** none needed for this case — verified with `Get-PnPTenantSite` rather than assuming the change reached everywhere.
+
+## Lessons Learned
 
 - **"Specific people" sharing isn't free of side effects just because it sounds more restrictive than a public link — it can create standing identity objects you now have to manage.**
 - **Directory audit logs (`Invite external user`, filtered by initiating app) are the fast way to tell whether guest sprawl is coming from a human process or a platform feature doing it automatically.**
@@ -56,4 +116,15 @@ Cleanup: removed the Guest Inviter role from everyone it had been granted to for
 - **A tenant-wide sharing policy change doesn't automatically cascade to resources that already have their own explicit, stricter setting.** Verify before assuming a policy change reaches everywhere it logically "should."
 - **Anonymous vs. identity-verified sharing is a security tradeoff to make deliberately per use case, not a blanket policy** — match it to how sensitive the actual content is, not just to which team is asking.
 - **When someone hits a "not allowed" error for an action most people can't do by default, check their specific role assignments before assuming a tenant-wide policy is misconfigured.** Here, `allowInvitesFrom` restricting invites to admins and Guest Inviters was working exactly as intended — the "fix" was identifying who legitimately needed the role, not treating the restriction itself as a bug.
-- **The same fix recurring for a different person, weeks later, is worth explicitly recognizing as a pattern rather than re-investigating from first principles** — and worth asking, at that point, whether the *fix* itself (granting a role) is the right long-term answer or just deferring the same underlying tension (here, it turned out to be the latter — see above).
+- **The same fix recurring for a different person, weeks later, is worth explicitly recognising as a pattern rather than re-investigating from first principles** — and worth asking, at that point, whether the *fix* itself (granting a role) is the right long-term answer or just deferring the same underlying tension (here, it turned out to be the latter — see above).
+
+## Quick Reference Checklist
+
+| If you see… | Do this |
+|---|---|
+| "Guest invitations aren't allowed" when sharing externally | Check `allowInvitesFrom` and the user's role assignments — likely working as intended |
+| Same error again for a different person | Check their role assignments only — same root cause |
+| Growing number of guest accounts, many never signed in | Audit logs: `Invite external user`, check initiating app |
+| Initiating app is SharePoint Online | Sharing links are creating guests — fix the sharing policy, not inviter permissions |
+| No "Anyone with the link" option in share dialog | OneDrive sharing capability capped at existing guests |
+| Tenant sharing change made | `Get-PnPTenantSite` — existing sites keep their own stricter setting |

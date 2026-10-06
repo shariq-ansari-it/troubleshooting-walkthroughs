@@ -1,38 +1,110 @@
 # Three "Noncompliant" Devices, Three Unrelated Root Causes
 
-**Stack:** Microsoft Intune compliance policies, Microsoft Defender, MDM sync/heartbeat
+## Purpose of this Document
 
-## TL;DR
+A case study in triaging several Intune devices that went noncompliant around the same time. The working theory — one shared cause, since all three were Windows 10 — was disproven by a single compliant comparison device on the identical build, and each device turned out to have a different, unrelated problem, including an actively used machine that had silently stopped checking in with Intune for roughly nine months.
 
-Three devices showed up noncompliant in Intune around the same time, and the working theory was that they shared a common cause — all three happened to be Windows 10. That theory got disproven cleanly by finding a fourth Windows 10 device on the identical OS build that *was* compliant. Once the "one shared cause" assumption was dropped, each device turned out to have a completely different, unrelated problem — including one actively-used machine that had silently stopped checking in with Intune for roughly nine months without anyone noticing.
+It is intentionally written to:
 
-## The starting theory, and why it fell apart
+- Give the triage sequence that separates a shared cause from unrelated ones quickly
+- Keep that sequence separate from the wrong theory that was tested and dropped
+- Record each device's actual cause and the response it needed
+- Help recognise the three different meanings of "noncompliant" next time
 
-Three noncompliant devices, all Windows 10, naturally suggests looking for something common to Windows 10 specifically — an OS-version-scoped compliance policy behaving unexpectedly, a Windows 10 feature update issue, something like that.
+## Environment
 
-That theory was tested directly: found another Windows 10 device, same OS build as the noncompliant ones, and checked its compliance state. It was compliant. Same OS, same build, different compliance outcome — that single comparison ruled out "something about Windows 10 itself" in one step, rather than requiring three separate parallel investigations to each independently rule out an OS-version cause.
+- Microsoft Intune compliance policies
+- Windows 10 devices (same OS build)
+- Microsoft Defender (Real-Time Protection)
+- MDM sync / heartbeat (last-sync and last-checkin timestamps)
 
-## Device 1: silently unsynced for about nine months
+---
 
-The most operationally significant finding. This device was in **active daily use** by its assigned user — not sitting in a drawer, not decommissioned, genuinely being worked on every day. And yet it hadn't completed an Intune sync in approximately nine months.
+## Correct End-to-End Process (Authoritative)
 
-That's a materially different kind of risk than a normal compliance failure: a device that's actively in use but invisible to Intune isn't receiving updated configuration profiles, isn't being evaluated against current compliance policy changes, and isn't receiving new security policy at all — while looking, to a user just doing their job day to day, completely normal. Nothing about the user's actual experience would have surfaced this; it was only visible by specifically checking last-sync timestamps in Intune rather than trusting that "device is in use" implies "device is checking in."
+### 1. Test the Shared-Cause Theory Against a Compliant Device
 
-## Device 2: genuinely stale/dead
+Several devices failing the same check at the same time naturally suggests one shared explanation — here, something about Windows 10 (an OS-version-scoped compliance policy behaving unexpectedly, a Windows 10 feature update issue).
 
-A more mundane case — a device that appeared to simply no longer be in active use at all. Confirmed via last-checkin data and treated as an offboarding/cleanup item rather than an active troubleshooting target.
+Before investigating each device, find a device that has the same suspected common factor (same OS, same build) and check its compliance state. If it's compliant, the shared factor isn't the cause. One comparison rules it out in a single step, rather than three parallel investigations each independently ruling out an OS-version cause. See [Issue 1](#issue-1--the-one-shared-cause-theory).
 
-## Device 3: a real, live compliance failure
+### 2. Check Last-Sync / Last-Checkin Timestamps for Each Device
 
-**Microsoft Defender Real-Time Protection** was actually disabled on this one — a genuine, currently-true compliance violation, unlike the other two. Correctly flagged by the compliance policy for exactly the reason compliance policies exist. Resolution here was the straightforward one: re-enable Real-Time Protection and confirm the compliance state updates on next check-in.
+Don't trust that "device is in use" implies "device is checking in". Check each device's last-sync timestamp in Intune. This separates:
 
-## Why the three-unrelated-cause framing matters
+- an active device that has stopped syncing — see [Issue 2](#issue-2--device-1-silently-unsynced-for-about-nine-months)
+- a device no longer in use at all — see [Issue 3](#issue-3--device-2-genuinely-staledead)
 
-The natural instinct when several devices fail the same check around the same time is to look for one shared explanation. That instinct is usually right — but confirming it costs very little (one comparison device, in this case) relative to what it costs to *not* check it and instead spend effort investigating three devices in parallel as if they're the same problem. Here, they genuinely weren't: one was an operational blind spot (silent sync failure on an active device), one was a lifecycle/offboarding matter, and one was an actual, current security-relevant failure. Each needed a completely different response, and treating them as a single incident would have masked at least two of the three.
+### 3. Check for a Real, Current Policy Violation
 
-## Takeaways
+For devices that are checking in, look at what the compliance policy is actually flagging — e.g. Microsoft Defender Real-Time Protection disabled. See [Issue 4](#issue-4--device-3-a-real-live-compliance-failure).
 
-- **Test a shared-cause theory against a device that *doesn't* exhibit the symptom before investing effort investigating each affected device individually.** One clean comparison (same OS/build, different outcome) can save significant time versus three parallel investigations.
-- **"Noncompliant" in Intune can mean several very different things — a real, current policy violation; a device that's stale/decommissioned; or a device that's actively used but has simply stopped checking in.** Each needs a different response, and lumping them together as "compliance issues" obscures which is which.
-- **A device silently failing to sync for months while still being actively used is arguably the highest-risk state of the three** — it looks completely normal to the end user and to anyone glancing at the device in person, and only shows up by specifically checking last-sync/last-checkin timestamps rather than assuming active use implies active management.
-- **Periodically auditing last-checkin times across your Intune fleet (not just reacting to compliance-flag alerts) is worth doing proactively** — a device can drift into this state with zero visible symptoms for the user, and zero alert unless something specifically checks for silence rather than for an active policy failure.
+### 4. Respond per Device, Not per Incident
+
+| Category | Response |
+|---|---|
+| Actively used, silently not syncing | Operational blind spot — not a policy failure; it isn't being managed at all |
+| Stale / no longer in use | Offboarding / cleanup item |
+| Real, current violation | Fix the violation, confirm compliance updates on next check-in |
+
+Treating the three as a single incident would have masked at least two of the three.
+
+**If this all happens → each device gets the response its actual cause needs.**
+
+---
+
+## Issues Encountered in This Case
+
+### Issue 1 — The one-shared-cause theory
+
+**Observed:** three noncompliant devices, all Windows 10, around the same time.
+
+**What didn't work:** assuming something common to Windows 10 — an OS-version-scoped compliance policy, a Windows 10 feature update issue.
+
+**Root cause:** there was no shared cause. Another Windows 10 device on the same OS build as the noncompliant ones was compliant — same OS, same build, different compliance outcome — which ruled out "something about Windows 10 itself".
+
+**Fix:** drop the shared-cause assumption and triage each device individually.
+
+### Issue 2 — Device 1: silently unsynced for about nine months
+
+**Observed:** the device was in **active daily use** by its assigned user — not in a drawer, not decommissioned — yet it hadn't completed an Intune sync in approximately nine months.
+
+**Root cause:** a silent sync failure on an active device. Nothing about the user's experience would have surfaced it; it was only visible by specifically checking last-sync timestamps in Intune.
+
+**Why it matters:** a materially different risk from a normal compliance failure. A device that's in use but invisible to Intune isn't receiving updated configuration profiles, isn't being evaluated against current compliance policy changes, and isn't receiving new security policy at all — while looking completely normal to the user.
+
+**Fix:** treat as an operational blind spot rather than a policy failure — the problem is that the device isn't being managed at all, not what a policy says about it.
+
+### Issue 3 — Device 2: genuinely stale/dead
+
+**Observed:** a device that appeared to simply no longer be in active use.
+
+**Root cause:** confirmed via last-checkin data — the device was no longer in use.
+
+**Fix:** treated as an offboarding/cleanup item rather than an active troubleshooting target.
+
+### Issue 4 — Device 3: a real, live compliance failure
+
+**Observed:** **Microsoft Defender Real-Time Protection** was disabled.
+
+**Root cause:** a genuine, currently true compliance violation — correctly flagged by the compliance policy for exactly the reason compliance policies exist.
+
+**Fix:** re-enable Real-Time Protection and confirm the compliance state updates on next check-in.
+
+## Lessons Learned
+
+- **Test a shared-cause theory against a device that *doesn't* exhibit the symptom before investigating each affected device individually.** One clean comparison (same OS/build, different outcome) can save significant time versus three parallel investigations
+- The instinct to look for one shared explanation is usually right — but confirming it costs very little (one comparison device) relative to investigating several devices in parallel as if they're the same problem
+- **"Noncompliant" in Intune can mean very different things — a real, current policy violation; a device that's stale/decommissioned; or a device that's actively used but has stopped checking in.** Each needs a different response, and lumping them together as "compliance issues" obscures which is which
+- **A device silently failing to sync for months while still being actively used is arguably the highest-risk state of the three** — it looks normal to the end user and to anyone glancing at it in person, and only shows up by checking last-sync/last-checkin timestamps rather than assuming active use implies active management
+- **Periodically audit last-checkin times across the Intune fleet (not just react to compliance-flag alerts)** — a device can drift into this state with zero visible symptoms for the user, and zero alert unless something specifically checks for silence rather than for an active policy failure
+
+## Quick Reference Checklist
+
+| If you see… | Do this |
+|---|---|
+| Several devices noncompliant at once with an obvious common factor | Check a compliant device with the same factor (same OS/build) before investigating each one |
+| Comparison device with the same OS/build is compliant | Drop the shared-cause theory; triage each device separately |
+| Device in daily use but last sync months ago | Operational blind spot — not receiving profiles or policy; handle separately from policy failures |
+| Device not in use, old last check-in | Offboarding / cleanup |
+| Defender Real-Time Protection disabled | Re-enable, confirm compliance updates on next check-in |

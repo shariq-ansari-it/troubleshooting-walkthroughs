@@ -661,7 +661,3 @@ finally {
     if ($connectedHere) { Disconnect-ExchangeOnline -Confirm:$false }
 }
 ```
-
----
-
-*This document is intended as a long-term reference for repeating the migration and for day-to-day joiner/leaver signature changes.*
