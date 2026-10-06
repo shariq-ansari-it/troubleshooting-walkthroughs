@@ -100,7 +100,7 @@ Check for:
 
 ### 3. Build the Signature HTML
 
-1. Send yourself an email with the current vendor signature and view its source.
+1. Get a copy of the current vendor signature **as an external recipient sees it** and view its source. The vendor usually only signs outbound external mail, so an internal email won't have it — send to a personal address, or find an external reply that quotes a colleague's email (search the mailbox for a line from the legal footer). Note every link in it, including ones wrapped around images such as social media icons — see [Issue 5](#issue-5--social-media-icons-not-clickable).
 2. Rebuild it as a single `<table>` with **inline styles only** (mail clients ignore `<style>` blocks).
 3. Replace per-person values with tokens:
 
@@ -124,6 +124,7 @@ Must-haves:
 
 - A **visible text line** `Email: %%Email%%` — the rule uses it to detect a signature already in the thread. Text inside an `href` isn't matched.
 - `width`, `height` and `alt` on every `<img>`
+- **Linked icons** (`<a href="..."><img ... border="0"></a>`) wherever the old signature had them — `border="0"` stops older Outlook drawing a blue box round linked images
 - **Under 5,000 characters** total — Exchange rejects longer disclaimer text
 - A little **top padding** on the outer table — the signature is appended straight after the last line of the body
 
@@ -434,13 +435,32 @@ function function>
 
 **Fix:** none needed — working as designed. Test step 3 is the **work → personal** reply. Agree the "signature on first message only" behaviour with the business before rollout.
 
+### Issue 5 — Social media icons not clickable
+
+**Observed:** after the pilot, the new signature showed the social media icons, but unlike the old vendor signature they weren't links.
+
+**Root cause:** the HTML was rebuilt from what the signature *looked* like, not from its source — the `<a href>` wrappers round the icons were missed. The original URLs weren't to hand either: the vendor only signed external mail, so no internal email carried them.
+
+**Fix:**
+
+1. Find an external reply that quotes a colleague's vendor-signed email, e.g. search the mailbox for a phrase from the legal footer, and read the `href` on each icon.
+2. Check each URL still resolves (old social URLs often redirect — that's fine):
+   ```bash
+   for u in <facebook-url> <linkedin-url> <twitter-url> <youtube-url>; do
+     curl -s -o /dev/null -L --max-time 10 -A 'Mozilla/5.0' -w "%{http_code} -> %{url_effective}\n" "$u"
+   done
+   ```
+3. Wrap each icon in the create script: `<a href="<url>"><img src="$img/facebook.png" width="24" height="24" alt="Facebook" border="0"></a>`.
+4. Re-check the length — four links added ~250 characters, taking a near-limit signature to 4,951 of 5,000.
+5. Commit, PR, then rerun the create script for existing senders — it updates their rules in place (`-WhatIf` should say **Update**, not Create). Retest after ~30 minutes by clicking each icon.
+
 ---
 
 ## Pilot Test Results
 
 | Test | Result |
 |---|---|
-| New message | One signature, all images, Entra fields correct |
+| New message | One signature, all images, Entra fields correct (social icons not linked at first — [Issue 5](#issue-5--social-media-icons-not-clickable)) |
 | Inbound | Untouched |
 | Reply chain | No duplicates; no new signature on later replies (by design) |
 | Meeting invite | No signature, `.ics` intact |
@@ -454,6 +474,8 @@ function function>
 - **Signature on first message only** is the visible behavioural change — agree it up front
 - **Internal mail is signed too** unless you add `-SentToScope NotInOrganization`
 - **Phone format comes from Entra** — fix it in the directory, not the rule
+- **Rebuild the signature from its HTML source, not its appearance** — links on images are invisible in a screenshot
+- **Leave headroom under the 5,000-character limit** — small additions like icon links add up quickly
 - **The vendor can rewrite its routing rule** if its connection is ever repaired, silently dropping `ExceptIfFrom` exclusions — first thing to check if double signatures reappear during side-by-side
 - `Set-TransportRule -ExceptIfFrom` **replaces** the whole list — always merge with existing entries
 - **Scripts should reuse an existing EXO session** — anything that connects unconditionally breaks device-code workflows
@@ -471,6 +493,7 @@ function function>
 | No signature on a reply | Expected — sender's signature already in the thread |
 | Blank line in signature | Missing Entra attribute (title/phone) |
 | `Signature HTML is N characters` error | Over 5,000 — shorten inline styles / text |
+| Icons show but aren't clickable | Wrap each `<img>` in `<a href>` with `border="0"`; get URLs from an external copy of the old signature |
 
 ---
 
@@ -515,7 +538,7 @@ $signatureHtml = @"
 <div style="${t}"><b>Tel:</b> %%PhoneNumber%%</div>
 <div style="${t}"><b>Web:</b> <a href="https://www.example.com/" style="color:#000;text-decoration:none;">www.example.com</a></div>
 </td></tr></table></td></tr>
-<tr><td style="padding:10px 0;"><img src="$img/linkedin.png" width="24" height="24" alt="LinkedIn"></td></tr>
+<tr><td style="padding:10px 0;"><a href="https://www.linkedin.com/company/example"><img src="$img/linkedin.png" width="24" height="24" alt="LinkedIn" border="0"></a></td></tr>
 <tr><td style="${f}font-size:7pt;color:#999;">Example Ltd is registered in England and Wales under number 01234567.<br>This e-mail and any attachments are confidential...</td></tr>
 </table>
 "@
