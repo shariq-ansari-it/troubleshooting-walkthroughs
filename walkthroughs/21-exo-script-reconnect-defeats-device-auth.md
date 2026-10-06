@@ -100,6 +100,43 @@ Stripping `Disconnect-ExchangeOnline` matters as much as stripping the connect: 
 
 The proper long-term fix belongs in the scripts themselves — only connect if `Get-ConnectionInformation` shows no active session, and only disconnect if the script made the connection — so they work the same whether they're run on Windows, on a new Mac, or from a session that's already signed in.
 
+## Migration steps: third-party signature service → transport rules
+
+The order used, piloting on one sender before touching anyone else. Steps 1–5 are done (the pilot); 6–8 are the planned remainder.
+
+1. **Check directory data.** Every signature field comes from Entra, so pull job title and phone for all licensed users first and fix any gaps — a blank attribute becomes a blank line in the signature:
+   ```bash
+   az rest --method get --url "https://graph.microsoft.com/v1.0/users?\$filter=accountEnabled eq true&\$select=displayName,mail,jobTitle,businessPhones,assignedLicenses&\$top=999" \
+     --query "value[?length(assignedLicenses)>\`0\`].[displayName,mail,jobTitle,join(',',businessPhones)]" -o tsv
+   ```
+   Shared/generic mailboxes often have "description" text in the job title field — decide whether they get a signature, and clean up the title first if so.
+2. **Host the images** on a public HTTPS location and confirm each one returns `200` with an image content type:
+   ```bash
+   for f in logo icons facebook linkedin; do curl -s -o /dev/null -w "$f %{http_code} %{content_type}\n" https://example.com/Images/$f.png; done
+   ```
+3. **Create the rule for one pilot sender**, dry run first:
+   ```powershell
+   & (NoConnect .\New-SignatureRule.ps1) -Sender me@example.com -WhatIf
+   & (NoConnect .\New-SignatureRule.ps1) -Sender me@example.com
+   Get-TransportRule "Signature - <Name>" | fl Name,State,Mode,Priority,From
+   ```
+4. **Exclude the pilot sender from the old service's routing rule**, or they get both signatures. The script keeps the existing exclusions and adds to them:
+   ```powershell
+   & (NoConnect .\Set-ServiceRuleSenderExclusion.ps1) -Sender me@example.com -WhatIf
+   & (NoConnect .\Set-ServiceRuleSenderExclusion.ps1) -Sender me@example.com
+   ```
+   Check it in the Exchange admin center: **Mail flow → Rules** → the service's routing rule → exceptions → "sender is".
+5. **Wait ~30 minutes, then test** from the pilot mailbox to a personal external address:
+   - a new message: exactly one signature, the new one, with all images loading;
+   - a reply chain (external reply, then reply again): the signature mustn't stack up;
+   - a meeting invite: no signature added.
+   If a test shows two signatures or none, the rules haven't propagated yet — wait and resend before troubleshooting. **Mail flow → Message trace** shows which rules a message actually matched.
+6. **Roll out to the remaining senders** — the scripts take an array, so it's the same two commands with the full list. *(pending)*
+7. **Cut the old service off**: disable its routing rule first (`Disable-TransportRule`, reversible), confirm mail still flows and signs correctly, then remove the rule and its outbound connector. Do this as soon as everyone's on the new rules rather than waiting for the subscription to lapse, or mail keeps being routed to a service that's about to stop processing it. *(pending)*
+8. **Cancel the subscription in writing before the notice deadline.** Signature SaaS subscriptions commonly auto-renew annually with a 30-day notice period and no refund for unused time — so give notice early, and use the remaining paid weeks as the cutover window. Get written confirmation back. *(pending)*
+
+Rollback for any sender is the reverse: remove their signature rule and take them back off the exclusion list (`-Remove`).
+
 ## Side notes on the transport-rule approach
 
 Things worth knowing before replacing a signature service with `ApplyHtmlDisclaimer` rules, whatever the auth situation:
