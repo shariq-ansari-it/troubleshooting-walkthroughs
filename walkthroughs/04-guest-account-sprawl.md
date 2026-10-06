@@ -1,8 +1,12 @@
 # Guest Account Sprawl From "Helpful" Sharing Links
 
+## TL;DR
+
+A support team was sharing internal training recordings with clients using "Specific people" links in OneDrive — the option that felt most secure. Each one of those links silently created a *permanent* external guest account in the directory, whether or not the recipient ever needed ongoing access. Traced it via directory audit logs, then made a deliberate tradeoff: switch the sharing default to anonymous, time-boxed links for this specific low-sensitivity content, instead of reflexively granting more people the ability to invite guests.
+
 ## Purpose of this Document
 
-A case study of guest account sprawl caused by support staff sharing training recordings with clients via OneDrive "Specific people" links — the option that felt most secure, but which silently creates a *permanent* external guest account per recipient. Traced via directory audit logs, then fixed with a deliberate tradeoff: anonymous, time-boxed links for this low-sensitivity content instead of granting more people the ability to invite guests.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

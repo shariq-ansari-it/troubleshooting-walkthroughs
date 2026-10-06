@@ -1,8 +1,12 @@
 # The Sponsorship Credit That Wouldn't Apply
 
+## TL;DR
+
+An Azure subscription kept getting billed in full (~£300+/month) despite a $5,000 credit having been redeemed for it. The credit was real and showing as available — just not against this subscription. Root cause: the credit had landed on one billing account, while the subscription itself was invoiced under a completely different, older billing account. No self-service tool covers moving a subscription between billing accounts in that direction, and the "obvious" CLI path to open a support ticket was blocked by an unrelated support-plan restriction. Fixed via a Microsoft-support-brokered subscription transfer that required an approval email from each billing account's owner.
+
 ## Purpose of this Document
 
-A case study of an Azure subscription that kept being billed in full (~£300+/month) despite a $5,000 credit having been redeemed for it — because the credit sat on one billing account while the subscription was invoiced under a different, older one. No self-service tool covered the move, and the CLI support-ticket path was blocked, so the fix was a Microsoft-support-brokered subscription transfer.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

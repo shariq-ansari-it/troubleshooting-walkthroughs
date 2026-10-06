@@ -1,8 +1,12 @@
 # Three Days Chasing an Intune Policy — the Real Cause Was a BIOS Toggle
 
+## TL;DR
+
+Windows Hello wouldn't set up on a brand-new laptop, and every symptom pointed at an Intune Windows Hello for Business / Convenience PIN policy problem — scoping, assignment groups, per-setting "Not applicable" states, even a plausible-sounding theory about WHfB conflicting with AVD password resets tenant-wide. Three layers into policy archaeology, all of it was wrong. The actual on-screen error message — never actually read carefully until day three — said Windows couldn't find a compatible camera or fingerprint scanner. The real cause was a BIOS setting called "Passwordless authentication," silently switched off, and non-responsive to clicking because the vendor's firmware requires a BIOS supervisor password to be set before that toggle can be changed at all.
+
 ## Purpose of this Document
 
-A case study for Windows Hello that wouldn't set up on a brand-new laptop. Every symptom pointed at an Intune Windows Hello for Business / Convenience PIN policy problem, and three days of policy investigation were all wrong; the real cause was a BIOS "Passwordless authentication" setting that was switched off and could only be changed once a BIOS supervisor password was set.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

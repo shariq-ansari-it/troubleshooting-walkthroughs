@@ -1,8 +1,12 @@
 # The BitLocker "Access Denied" That Wasn't About BitLocker's Own Settings
 
+## TL;DR
+
+An external USB hard drive suddenly started throwing "the media is write protected" on an Entra-joined Windows 11 PC, for a user who was a local administrator. Every classic cause for that message checked out clean — disk-level flags, NTFS permissions, even the hardware itself (same result on a second, different drive). The actual cause was an Intune-enforced policy requiring BitLocker encryption on removable drives, which also blocked BitLocker's own encryption wizard from running — and which wasn't visible under Intune's dedicated Disk Encryption blade at all, because it had been bundled into a generically-named Settings Catalog profile instead.
+
 ## Purpose of this Document
 
-A case study for an external USB hard drive that suddenly started throwing "the media is write protected" on an Entra-joined Windows 11 PC, for a user who was a local administrator. Every classic cause checked out clean; the actual cause was an Intune-enforced policy requiring BitLocker on removable drives, buried in a generically-named Settings Catalog profile rather than under the Disk Encryption blade.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

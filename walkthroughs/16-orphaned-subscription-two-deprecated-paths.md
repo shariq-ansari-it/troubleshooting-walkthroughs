@@ -1,8 +1,12 @@
 # An Orphaned Subscription Blocked by Two Independently Deprecated Transfer Paths
 
+## TL;DR
+
+A legacy Azure subscription needed its administrative ownership transferred to a current team member, and every self-service path for doing that turned out to be blocked — for two completely unrelated reasons that happened to overlap on the same subscription. The classic "Change service administrator" control was permanently disabled because Microsoft had fully retired that entire administrative model. The fallback option, a billing-ownership transfer, was then rejected too — because the subscription's billing was CSP/Partner-managed, a category explicitly excluded from that self-service flow regardless of what role is held.
+
 ## Purpose of this Document
 
-A case study of a legacy Azure subscription whose administrative ownership needed transferring to a current team member, where every self-service path was blocked — for two completely unrelated reasons that happened to overlap on the same subscription. The classic "Change service administrator" control was permanently disabled because Microsoft had fully retired that administrative model; the fallback billing-ownership transfer was rejected because the subscription was CSP/Partner-billed.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

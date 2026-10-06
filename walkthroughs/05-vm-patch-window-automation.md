@@ -1,8 +1,12 @@
 # Automating a VM Patch Window With Azure Automation + Resource Graph
 
+## TL;DR
+
+A fleet of Azure VMs had daily auto-shutdown enabled to save cost, but the weekly maintenance/patch window ran overnight — after the VMs had already shut themselves down, so scheduled patching silently never ran. Built a small Azure Automation Account with two runbooks (start-before, stop-after) driven off a system-assigned managed identity and a live Resource Graph query, so any VM enrolled in a maintenance configuration gets picked up automatically without maintaining a hardcoded VM list anywhere.
+
 ## Purpose of this Document
 
-A case study and build reference for an Azure VM fleet whose daily auto-shutdown ran before the overnight patch window, so scheduled patching silently never ran. The fix was an Azure Automation Account with two runbooks (start-before, stop-after) using a system-assigned managed identity and a live Resource Graph query, so any VM enrolled in a maintenance configuration is picked up automatically — no hardcoded VM list.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

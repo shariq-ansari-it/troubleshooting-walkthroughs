@@ -1,8 +1,12 @@
 # RDP and Console Logons Hang After a Security Update — and the Fix Windows Update Never Offered
 
+## TL;DR
+
+A Hyper-V guest running a multi-user line-of-business app (Sage 200 desktop client over RDP, with SQL Server) stopped accepting logons: new RDP sessions failed, and so did logons through the Hyper-V console. Hyper-V said the VM was running, heartbeat OK, low CPU. Low disk space was the first guess, because SQL logs had been cleared two days earlier (log growth on this kind of host is covered in [walkthrough 15](15-rds-performance-collapse.md)), but it turned out to have nothing to do with it. The real cause was a known Microsoft bug in the **September 2026 security update (KB5122871 on Server 2025, KB5122882 on Server 2022)** that can leave Remote Desktop Services hung. Microsoft fixed it in an out-of-band update released days later, but that fix is **offered only through the Update Catalog and WSUS, not Windows Update**. The server had installed the faulty update twelve days *after* the fix came out and never received the fix.
+
 ## Purpose of this Document
 
-A case study and recovery runbook for a Hyper-V guest running a multi-user line-of-business app (Sage 200 desktop client over RDP, with SQL Server) that stopped accepting logons — over RDP and through the Hyper-V console — while Hyper-V showed it running, heartbeat OK, low CPU. Low disk space was the first guess, because SQL logs had been cleared two days earlier (log growth on this kind of host is covered in [walkthrough 15](15-rds-performance-collapse.md)), but it had nothing to do with it. The real cause was a known Microsoft bug in the **September 2026 security update (KB5122871 on Server 2025, KB5122882 on Server 2022)** that can leave Remote Desktop Services hung. Microsoft's out-of-band fix is **offered only through the Update Catalog and WSUS, not Windows Update** — the server installed the faulty update twelve days *after* the fix came out and never received the fix.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

@@ -1,8 +1,12 @@
 # Stuck at "Registered," Not "Joined" — the Fix Was a Link, Not a Network Fix
 
+## TL;DR
+
+A new laptop wouldn't complete Microsoft Entra join. The visible error decoded to a WinInet name-resolution failure, which sent the investigation down a network/security-software path — a third-party antivirus's network filter driver, proxy configuration, IPv6, NRPT, hosts file, Windows Firewall — all correctly ruled out one at a time. The actual cause: the "Access work or school → Connect" flow the user had gone through only adds an SSO account; it doesn't perform a real Entra Join at all. The genuine join trigger was a separate, easy-to-miss link — "Join this device to Microsoft Entra ID" — at the bottom of that same settings page.
+
 ## Purpose of this Document
 
-A case study for a new laptop that wouldn't complete Microsoft Entra join. The error decoded to a WinInet name-resolution failure, so every network and security-software cause was ruled out one at a time — but the real cause was that "Access work or school → Connect" only adds an SSO account. The actual join is a separate link at the bottom of the same page.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

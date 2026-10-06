@@ -1,8 +1,12 @@
 # Why `az login` Can't Query Intune (And What Does)
 
+## TL;DR
+
+Trying to query Intune/device-management data (compliance state, managed devices, etc.) via Microsoft Graph, authenticated through the Azure CLI, fails with `AADSTS65002` — no matter what scope you request or what role the signed-in account holds. This isn't a permissions problem and consent won't fix it: the Azure CLI's own first-party application simply isn't pre-authorized by Microsoft for Intune/device-management Graph scopes. The Microsoft Graph PowerShell SDK's app registration *is* pre-authorized for exactly these scopes — switching to it is the actual fix, not a workaround for something wrong on your end.
+
 ## Purpose of this Document
 
-A case study and reference for querying Intune/device-management data (compliance state, managed devices, etc.) via Microsoft Graph. Authenticating through the Azure CLI fails with `AADSTS65002` no matter what scope or role is involved; the Microsoft Graph PowerShell SDK is the actual fix, not a workaround for something wrong on your end.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

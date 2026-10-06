@@ -1,8 +1,12 @@
 # Rolling Out MFA to Servers With No Directory Service
 
+## TL;DR
+
+Most MFA rollout guidance assumes you have a directory service to sync from. These servers didn't — local Windows accounts only, no AD, no SSO, nothing centralized to point an MFA provider at. That single constraint reshapes almost every other decision: how users get provisioned, how the same person is matched across machines with inconsistent usernames, how offboarding works, and — critically — how you avoid locking yourself out of a production server while testing an authentication change on it.
+
 ## Purpose of this Document
 
-A case study and planning reference for rolling out MFA on RDP/RDS servers that use local Windows accounts only — no Active Directory, no SSO, nothing centralized to point an MFA provider at. That single constraint reshapes provisioning, cross-server identity matching, offboarding and, critically, how to avoid locking yourself out of a production server while testing an authentication change on it.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

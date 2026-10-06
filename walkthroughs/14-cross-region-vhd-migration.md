@@ -1,8 +1,12 @@
 # Migrating a Golden-Copy VHD Into Azure Across Regions
 
+## TL;DR
+
+Turning a large (~127GB) Hyper-V VHD "golden copy" into a repeatable, disposable Azure test VM hit two separate Azure disk-import restrictions back to back: importing directly from a SAS-token blob URL is flatly rejected, and importing from a storage account via RBAC requires the source storage account to be in the **same region** as the target managed disk — which it wasn't. Fixed with a server-side staged blob copy into a same-region storage account first. A side investigation into what looked like duplicate/conflicting NSG rule entries turned out to be two genuinely different IP addresses from the same office, just easy to misread at a glance.
+
 ## Purpose of this Document
 
-A case study and runbook for turning a large (~127GB) Hyper-V VHD "golden copy" into a repeatable, disposable Azure test VM — spin up from a known-good image, test, tear down — without repeating a slow, error-prone manual setup each time. The import hit two Azure disk-import restrictions back to back (no SAS-URL source; source storage account must be in the same region as the disk), fixed with a server-side staged blob copy into a same-region storage account.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

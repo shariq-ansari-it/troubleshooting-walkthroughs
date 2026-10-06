@@ -1,8 +1,12 @@
 # Building a Nested Proxmox Lab: Secure Boot Silently Falls Through to PXE
 
+## TL;DR
+
+Building a Proxmox VE test environment inside a Hyper-V VM (itself running on a physical host) surfaced a chain of unrelated gotchas, each with a different kind of non-obvious cause: a capped RDP frame rate fixed by a registry value, a VM that wouldn't start at all traced to a BIOS virtualization flag despite Hyper-V already working for other VMs, a VM that booted straight to network PXE with zero error message because Secure Boot was silently rejecting Proxmox's unsigned bootloader, and an installer that couldn't see its own attached virtual DVD drive — a known Hyper-V compatibility bug requiring a version downgrade.
+
 ## Purpose of this Document
 
-A case study and build reference for standing up Proxmox VE as a nested hypervisor inside a Hyper-V VM (itself running on a physical host). The build surfaced a chain of unrelated gotchas, each with a different kind of non-obvious cause — a capped RDP frame rate, a VM that wouldn't start because of a BIOS virtualization flag, a silent fallthrough to PXE caused by Secure Boot, and an installer that couldn't see its own DVD drive.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

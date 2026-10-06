@@ -1,8 +1,12 @@
 # Patching a VDI Fleet Without Touching Everyone Else's Session
 
+## TL;DR
+
+A softphone/VDI client app started throwing "Update required — your desktop app is no longer supported" on one virtual desktop, while identical VMs in the same Intune group kept working fine. The app vendor enforces a minimum client version server-side; once a version falls below the cutoff, it stops working entirely rather than degrading gracefully. The fix needed a Win32 app supersedence chain in Intune plus a way to push the update to exactly one device without triggering an update — and a possible outage — across the whole fleet at once. Intune Assignment Filters solved the targeting problem; a Graph API quirk almost derailed the supersedence setup.
+
 ## Purpose of this Document
 
-A case study and runbook for pushing an urgent Win32 app update to exactly one Intune-managed virtual desktop, after a softphone/VDI client hit the vendor's server-side minimum-version cutoff ("Update required — your desktop app is no longer supported") while identical VMs in the same group kept working. The fix combined a Win32 supersedence chain with an Intune Assignment Filter.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

@@ -1,8 +1,12 @@
 # An RDS Environment's Performance Collapse, Triggered by Onboarding
 
+## TL;DR
+
+A hosted Remote Desktop Services environment started running noticeably slower right after several new users were onboarded onto it. The new users themselves weren't the direct cause — they were the trigger that pushed several pre-existing, compounding resource pressures over a threshold at the same time: a SQL Server transaction log that had grown to consume nearly all remaining free disk space, general RAM pressure from the additional concurrent sessions, and an entirely unrelated desktop-OS service running needlessly on a server host and consuming resources for no purpose at all.
+
 ## Purpose of this Document
 
-A case study and runbook for a hosted Remote Desktop Services environment that slowed down right after several new users were onboarded. The new users weren't the direct cause — they were the trigger that pushed pre-existing, compounding resource pressures over a threshold at the same time: a SQL Server transaction log consuming nearly all free disk space, RAM pressure from the extra sessions, and a desktop-OS service running needlessly on a server host. This document owns SQL transaction log growth diagnosis and fix.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

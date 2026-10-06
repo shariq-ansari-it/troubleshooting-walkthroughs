@@ -1,8 +1,12 @@
 # The Firewall Change That Broke a Customer We Didn't Touch
 
+## TL;DR
+
+A security hardening project restricted several internally-hosted servers to a static-IP allowlist plus VPN, for anyone else. Applying it to one particular server broke access completely — for internal staff *and* for something we hadn't accounted for at all: an external product-licensing endpoint used by paying customers with no VPN access whatsoever. Two separate problems turned out to be tangled together — a VPN routing failure, and a shared IP address serving two logically unrelated purposes. Untangling them was most of the work; the actual firewall change was rolled back in minutes.
+
 ## Purpose of this Document
 
-A case study of a security hardening change — restricting hosted servers to a static-IP allowlist plus VPN — that, on one server, broke access for internal staff *and* for an external product-licensing endpoint used by paying customers with no VPN. Two problems were tangled together: a VPN routing failure, and a shared IP serving two unrelated purposes. The firewall change itself was rolled back in minutes; untangling the causes was most of the work.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

@@ -1,8 +1,12 @@
 # The Cloud PC Clipboard That Needed Three Separate Fixes
 
+## TL;DR
+
+Copy-paste didn't work at all on a brand-new Cloud PC — not from the local device into the Cloud PC, not the other way, and not into a nested VM running inside it either. The obvious fix (find the "allow clipboard redirection" policy and turn it on) got applied, reported success, and changed nothing. It took three separate, independently-gated layers to actually fix it: a master on/off switch, a completely separate direction-and-format restriction sitting on top of it, and — once both of those were identified — a self-inflicted Intune policy conflict that silently blocked the fix from ever reaching the device for hours after it was "configured correctly."
+
 ## Purpose of this Document
 
-A case study of copy-paste not working at all on a brand-new Cloud PC — not from the local device into the Cloud PC, not the other way, and not into a nested VM running inside it. The obvious fix (turn on the "allow clipboard redirection" policy) applied, reported success, and changed nothing. It took three separate, independently-gated layers: a master on/off switch, a separate direction-and-format restriction on top of it, and a self-inflicted Intune policy conflict that silently blocked the fix from reaching the device for hours after it was "configured correctly."
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

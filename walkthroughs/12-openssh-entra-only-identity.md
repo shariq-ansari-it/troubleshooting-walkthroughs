@@ -1,8 +1,12 @@
 # Windows OpenSSH Can't Authenticate a Cloud-Only Entra Identity — and Other SSH Surprises
 
+## TL;DR
+
+Setting up direct SSH access to an Entra-joined PC (as an alternative to routing everything through a mesh-VPN-brokered RDP session) turned up a genuinely surprising, documented limitation: Windows' OpenSSH server cannot authenticate a cloud-only Entra ID identity as a Windows security principal, in any username format. Along the way: a slow feature install that looked hung but wasn't, a firewall rule scoped to the wrong network profile, and a background benchmark process that kept dying the moment its parent SSH session closed.
+
 ## Purpose of this Document
 
-A case study and setup reference for getting direct SSH working on an Entra-joined Windows PC, as a lighter-weight alternative to a Tailscale-brokered RDP session and for scripted/automated tasks. The headline finding: Windows' OpenSSH server cannot authenticate a cloud-only Entra ID identity as a Windows security principal, in any username format.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

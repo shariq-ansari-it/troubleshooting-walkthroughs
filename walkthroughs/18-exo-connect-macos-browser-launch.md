@@ -1,8 +1,12 @@
 # `Connect-ExchangeOnline` Throws `PlatformNotSupportedException` on a New macOS Release
 
+## TL;DR
+
+`Connect-ExchangeOnline` (interactive, browser-based auth) can fail immediately with a `PlatformNotSupportedException` on a recently released macOS version — before any login prompt appears, and with no network or account problem involved. The exception message is literally the macOS version string. This is MSAL's cross-platform browser-launch code failing to recognize how new the OS is, not anything wrong with your credentials, your tenant, or your machine. The fix is to skip the local-browser launch path entirely with device code authentication.
+
 ## Purpose of this Document
 
-A case study and reference for `Connect-ExchangeOnline` (interactive, browser-based auth) failing immediately with a `PlatformNotSupportedException` on a recently released macOS version — before any login prompt appears, and with no network or account problem involved. The exception message is literally the macOS version string. It is MSAL's cross-platform browser-launch code failing to recognize how new the OS is, not anything wrong with your credentials, your tenant, or your machine. The fix is device code authentication.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

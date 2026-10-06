@@ -1,8 +1,12 @@
 # The License Count That Doubled Overnight — Stacking, Not a Gap
 
+## TL;DR
+
+Right after redeeming an annual Microsoft partner benefits package, the tenant's aggregate license counts for two SKUs abruptly doubled — one went from 35 to 70, another from 10 to 15 — alongside a batch of "N subscriptions will expire soon" warnings. The obvious read was either a licensing gap about to open up, or an overlap that needed cleaning up. Neither was right. Cross-referencing two different Microsoft views of the same tenant against each other showed the real mechanism: each year's benefit redemption creates a brand-new license batch stacked on top of the previous year's, rather than renewing or merging it. Nothing was broken, but there's no self-service way to clean it up, and it recurs — a little worse — every year.
+
 ## Purpose of this Document
 
-A case study of a tenant whose aggregate license counts for two SKUs abruptly doubled right after redeeming an annual Microsoft partner benefits package — one went from 35 to 70, another from 10 to 15 — alongside a batch of "N subscriptions will expire soon" warnings. It looked like either a licensing gap about to open up or an overlap needing cleanup; it was neither. Each year's benefit redemption creates a brand-new license batch stacked on top of the previous year's, rather than renewing or merging it.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

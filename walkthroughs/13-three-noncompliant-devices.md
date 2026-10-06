@@ -1,8 +1,12 @@
 # Three "Noncompliant" Devices, Three Unrelated Root Causes
 
+## TL;DR
+
+Three devices showed up noncompliant in Intune around the same time, and the working theory was that they shared a common cause — all three happened to be Windows 10. That theory got disproven cleanly by finding a fourth Windows 10 device on the identical OS build that *was* compliant. Once the "one shared cause" assumption was dropped, each device turned out to have a completely different, unrelated problem — including one actively-used machine that had silently stopped checking in with Intune for roughly nine months without anyone noticing.
+
 ## Purpose of this Document
 
-A case study in triaging several Intune devices that went noncompliant around the same time. The working theory — one shared cause, since all three were Windows 10 — was disproven by a single compliant comparison device on the identical build, and each device turned out to have a different, unrelated problem, including an actively used machine that had silently stopped checking in with Intune for roughly nine months.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 

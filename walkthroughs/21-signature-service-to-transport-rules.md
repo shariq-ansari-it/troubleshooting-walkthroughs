@@ -1,8 +1,14 @@
 # Replacing a Third-Party Email Signature Service With Exchange Transport Rules
 
+## TL;DR
+
+A paid signature SaaS was coming up for annual renewal, and everything it was doing for a small organisation — one standard HTML signature, filled in from each user's directory profile — can be done natively with Exchange Online mail flow rules at no extra cost. The approach: one `ApplyHtmlDisclaimer` rule per sender using Entra attribute tokens, images hosted on a public HTTPS URL, senders excluded from the old service's routing rule as they move over, piloted on one mailbox before rollout. It works, with one real behavioural difference worth agreeing up front: the native rule signs the first message in a thread but not later replies.
+
+This write-up is meant to be a complete runbook — everything needed to do it again from scratch, including the scripts.
+
 ## Purpose of this Document
 
-A case study and reference runbook for replacing a paid email signature SaaS with native Exchange Online mail flow (transport) rules — one HTML signature per sender, filled in from each user's Entra profile.
+A case study and reference runbook for the problem summarised in the TL;DR above.
 
 It is intentionally written to:
 
